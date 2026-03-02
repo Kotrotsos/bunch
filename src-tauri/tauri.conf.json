@@ -30,13 +30,6 @@
     }
   },
   "plugins": {
-    "fs": {
-      "scope": {
-        "allow": [
-          "$HOME/.claude/**",
-          "$HOME/.claude"
-        ]
-      }
-    }
+    "fs": {}
   }
 }
