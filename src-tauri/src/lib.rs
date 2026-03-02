@@ -17,6 +17,8 @@ pub fn run() {
             scan::search_config_content,
             files::read_config_file,
             files::write_config_file,
+            files::delete_config_file,
+            files::show_in_folder,
             watch::start_watching,
             watch::stop_watching,
         ])

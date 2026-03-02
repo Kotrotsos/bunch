@@ -45,6 +45,14 @@ export async function searchConfigContent(
   return invoke<SearchResult[]>("search_config_content", { query });
 }
 
+export async function deleteConfigFile(path: string): Promise<void> {
+  return invoke<void>("delete_config_file", { path });
+}
+
+export async function showInFolder(path: string): Promise<void> {
+  return invoke<void>("show_in_folder", { path });
+}
+
 export async function startWatching(): Promise<void> {
   return invoke<void>("start_watching");
 }

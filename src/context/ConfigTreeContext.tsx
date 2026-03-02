@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -20,6 +21,7 @@ import {
   scanProjectFolder,
   readConfigFile,
   writeConfigFile,
+  deleteConfigFile,
   getInheritanceChain,
   searchConfigContent,
   startWatching,
@@ -43,6 +45,7 @@ interface ConfigTreeContextValue {
   inheritanceChain: InheritanceChain | null;
   rescan: () => Promise<void>;
   scanProject: () => Promise<void>;
+  deleteFile: (path: string) => Promise<void>;
   openFile: (file: ConfigFile) => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
@@ -60,6 +63,35 @@ const ConfigTreeContext = createContext<ConfigTreeContextValue>(
   {} as ConfigTreeContextValue
 );
 
+// Collect expanded node IDs from a tree
+function collectExpandedIds(nodes: TreeNodeData[]): Set<string> {
+  const ids = new Set<string>();
+  for (const node of nodes) {
+    if (node.expanded) ids.add(node.id);
+    if (node.children.length > 0) {
+      for (const id of collectExpandedIds(node.children)) {
+        ids.add(id);
+      }
+    }
+  }
+  return ids;
+}
+
+// Apply expanded state to rebuilt tree nodes
+function applyExpandedIds(
+  nodes: TreeNodeData[],
+  expandedIds: Set<string>
+): TreeNodeData[] {
+  return nodes.map((node) => ({
+    ...node,
+    expanded: expandedIds.has(node.id) || node.expanded,
+    children:
+      node.children.length > 0
+        ? applyExpandedIds(node.children, expandedIds)
+        : node.children,
+  }));
+}
+
 export function ConfigTreeProvider({ children }: { children: ReactNode }) {
   const [tree, setTree] = useState<ConfigTree | null>(null);
   const [rawTreeNodes, setRawTreeNodes] = useState<TreeNodeData[]>([]);
@@ -73,6 +105,19 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
   const [inheritanceChain, setInheritanceChain] =
     useState<InheritanceChain | null>(null);
   const [scannedProjectPaths, setScannedProjectPaths] = useState<string[]>([]);
+  const treeRef = useRef<ConfigTree | null>(null);
+
+  // Rebuild tree nodes from tree data, preserving expanded state
+  const rebuildTreeNodes = useCallback(
+    (newTree: ConfigTree) => {
+      setRawTreeNodes((prev) => {
+        const expandedIds = collectExpandedIds(prev);
+        const freshNodes = buildTreeData(newTree);
+        return applyExpandedIds(freshNodes, expandedIds);
+      });
+    },
+    []
+  );
 
   const rescan = useCallback(async () => {
     setLoading(true);
@@ -80,50 +125,78 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     try {
       const result = await scanConfigTree();
       setTree(result);
-      setRawTreeNodes(buildTreeData(result));
+      treeRef.current = result;
+      rebuildTreeNodes(result);
       setScannedProjectPaths(result.projects.map((p) => p.decodedPath));
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [rebuildTreeNodes]);
 
   const scanProject = useCallback(async () => {
     try {
       const selected = await open({ directory: true, multiple: false });
       if (!selected) return;
 
-      const folderPath = typeof selected === "string" ? selected : selected[0];
-      if (!folderPath) return;
-
-      const projectNode = await scanProjectFolder(folderPath);
+      const projectNode = await scanProjectFolder(selected);
       if (!projectNode) return;
 
-      setTree((prev) => {
-        if (!prev) return prev;
-        const existing = prev.projects.findIndex(
-          (p) => p.decodedPath === projectNode.decodedPath
-        );
-        const projects =
-          existing >= 0
-            ? prev.projects.map((p, i) => (i === existing ? projectNode : p))
-            : [...prev.projects, projectNode].sort((a, b) =>
-                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
-              );
-        const updated = { ...prev, projects };
-        setRawTreeNodes(buildTreeData(updated));
-        return updated;
-      });
+      const prev = treeRef.current;
+      if (!prev) return;
+
+      const existing = prev.projects.findIndex(
+        (p) => p.decodedPath === projectNode.decodedPath
+      );
+      const projects =
+        existing >= 0
+          ? prev.projects.map((p, i) => (i === existing ? projectNode : p))
+          : [...prev.projects, projectNode].sort((a, b) =>
+              a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+            );
+      const updated = { ...prev, projects };
+      setTree(updated);
+      treeRef.current = updated;
+      rebuildTreeNodes(updated);
 
       setScannedProjectPaths((prev) => {
-        if (prev.includes(folderPath)) return prev;
-        return [...prev, folderPath];
+        if (prev.includes(selected)) return prev;
+        return [...prev, selected];
       });
     } catch (e) {
       setError(`Failed to scan project: ${e}`);
     }
-  }, []);
+  }, [rebuildTreeNodes]);
+
+  const deleteFile = useCallback(
+    async (path: string) => {
+      try {
+        await deleteConfigFile(path);
+        // Close tab if open
+        setTabs((prev) => prev.filter((t) => t.path !== path));
+        // Remove from tree
+        const prev = treeRef.current;
+        if (!prev) return;
+        const updated: ConfigTree = {
+          ...prev,
+          global: {
+            files: prev.global.files.filter((f) => f.path !== path),
+          },
+          projects: prev.projects.map((p) => ({
+            ...p,
+            files: p.files.filter((f) => f.path !== path),
+          })),
+        };
+        setTree(updated);
+        treeRef.current = updated;
+        rebuildTreeNodes(updated);
+      } catch (e) {
+        setError(`Failed to delete file: ${e}`);
+      }
+    },
+    [rebuildTreeNodes]
+  );
 
   // Rescan only loaded projects (global + scanned projects)
   const rescanLoaded = useCallback(async () => {
@@ -144,11 +217,12 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         scanTimeMs: globalResult.scanTimeMs,
       };
       setTree(result);
-      setRawTreeNodes(buildTreeData(result));
+      treeRef.current = result;
+      rebuildTreeNodes(result);
     } catch (e) {
       console.error("Rescan loaded failed:", e);
     }
-  }, [scannedProjectPaths]);
+  }, [scannedProjectPaths, rebuildTreeNodes]);
 
   // Initial scan: global-only + file watcher
   useEffect(() => {
@@ -158,7 +232,8 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
       try {
         const result = await scanGlobalOnly();
         setTree(result);
-        setRawTreeNodes(buildTreeData(result));
+        treeRef.current = result;
+        rebuildTreeNodes(result);
       } catch (e) {
         setError(String(e));
       } finally {
@@ -178,7 +253,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     return () => {
       unlisten?.();
     };
-  }, [rescanLoaded]);
+  }, [rescanLoaded, rebuildTreeNodes]);
 
   // Search debounce
   useEffect(() => {
@@ -323,6 +398,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         inheritanceChain,
         rescan,
         scanProject,
+        deleteFile,
         openFile,
         closeTab,
         setActiveTab: setActiveTabId,

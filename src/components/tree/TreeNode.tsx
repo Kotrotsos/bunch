@@ -1,5 +1,14 @@
+import { useState, useCallback } from "react";
 import { useConfigTree } from "../../context/ConfigTreeContext";
+import { showInFolder } from "../../lib/tauri-commands";
+import { ContextMenu } from "./ContextMenu";
 import type { TreeNodeData, AgentOwner } from "../../types/config-tree";
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  filePath: string;
+}
 
 interface TreeNodeProps {
   node: TreeNodeData;
@@ -32,7 +41,19 @@ const OWNER_COLORS: Record<AgentOwner, string> = {
 };
 
 export function TreeNode({ node, depth }: TreeNodeProps) {
-  const { openFile, showInheritance, toggleNodeExpanded } = useConfigTree();
+  const { openFile, deleteFile, showInheritance, toggleNodeExpanded } =
+    useConfigTree();
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(
+    null
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, filePath: string) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY, filePath });
+    },
+    []
+  );
 
   const paddingLeft = depth * 16 + 8;
 
@@ -40,31 +61,53 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
     const fileType = node.configFile.fileType;
     const icon = FILE_TYPE_ICONS[fileType] || "?";
     const color = FILE_TYPE_COLORS[fileType] || "text-gray-500";
+    const filePath = node.configFile.path;
 
     const owner = node.configFile.owner;
 
     return (
-      <button
-        onClick={() => openFile(node.configFile!)}
-        className="w-full text-left py-1 pr-2 text-sm tree-node-hover flex items-center gap-2"
-        style={{ paddingLeft }}
-      >
-        <span
-          className={`w-4 h-4 flex items-center justify-center text-xs font-bold rounded ${color}`}
+      <>
+        <button
+          onClick={() => openFile(node.configFile!)}
+          onContextMenu={(e) => handleContextMenu(e, filePath)}
+          className="w-full text-left py-1 pr-2 text-sm tree-node-hover flex items-center gap-2"
+          style={{ paddingLeft }}
         >
-          {icon}
-        </span>
-        <span className="truncate text-gray-700 dark:text-gray-300">
-          {node.label}
-        </span>
-        {owner && owner !== "User" && (
           <span
-            className={`ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium rounded ${OWNER_COLORS[owner]}`}
+            className={`w-4 h-4 flex items-center justify-center text-xs font-bold rounded ${color}`}
           >
-            {owner}
+            {icon}
           </span>
+          <span className="truncate text-gray-700 dark:text-gray-300">
+            {node.label}
+          </span>
+          {owner && owner !== "User" && (
+            <span
+              className={`ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium rounded ${OWNER_COLORS[owner]}`}
+            >
+              {owner}
+            </span>
+          )}
+        </button>
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onClose={() => setContextMenu(null)}
+            items={[
+              {
+                label: "Show in Enclosing Folder",
+                onClick: () => showInFolder(contextMenu.filePath),
+              },
+              {
+                label: "Delete",
+                danger: true,
+                onClick: () => deleteFile(contextMenu.filePath),
+              },
+            ]}
+          />
         )}
-      </button>
+      </>
     );
   }
 
