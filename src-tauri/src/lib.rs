@@ -8,8 +8,11 @@ use commands::{files, scan, watch};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             scan::scan_config_tree,
+            scan::scan_global_only,
+            scan::scan_project_folder,
             scan::get_inheritance_chain,
             scan::search_config_content,
             files::read_config_file,

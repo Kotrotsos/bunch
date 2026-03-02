@@ -16,12 +16,15 @@ import type {
 } from "../types/config-tree";
 import {
   scanConfigTree,
+  scanGlobalOnly,
+  scanProjectFolder,
   readConfigFile,
   writeConfigFile,
   getInheritanceChain,
   searchConfigContent,
   startWatching,
 } from "../lib/tauri-commands";
+import { open } from "@tauri-apps/plugin-dialog";
 import { buildTreeData, filterTreeByType } from "../lib/config-parser";
 import { listen } from "@tauri-apps/api/event";
 
@@ -39,6 +42,7 @@ interface ConfigTreeContextValue {
   searchResults: SearchResult[];
   inheritanceChain: InheritanceChain | null;
   rescan: () => Promise<void>;
+  scanProject: () => Promise<void>;
   openFile: (file: ConfigFile) => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
@@ -68,6 +72,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [inheritanceChain, setInheritanceChain] =
     useState<InheritanceChain | null>(null);
+  const [scannedProjectPaths, setScannedProjectPaths] = useState<string[]>([]);
 
   const rescan = useCallback(async () => {
     setLoading(true);
@@ -76,6 +81,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
       const result = await scanConfigTree();
       setTree(result);
       setRawTreeNodes(buildTreeData(result));
+      setScannedProjectPaths(result.projects.map((p) => p.decodedPath));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -83,14 +89,88 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Initial scan + file watcher
+  const scanProject = useCallback(async () => {
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (!selected) return;
+
+      const folderPath = typeof selected === "string" ? selected : selected[0];
+      if (!folderPath) return;
+
+      const projectNode = await scanProjectFolder(folderPath);
+      if (!projectNode) return;
+
+      setTree((prev) => {
+        if (!prev) return prev;
+        const existing = prev.projects.findIndex(
+          (p) => p.decodedPath === projectNode.decodedPath
+        );
+        const projects =
+          existing >= 0
+            ? prev.projects.map((p, i) => (i === existing ? projectNode : p))
+            : [...prev.projects, projectNode].sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+              );
+        const updated = { ...prev, projects };
+        setRawTreeNodes(buildTreeData(updated));
+        return updated;
+      });
+
+      setScannedProjectPaths((prev) => {
+        if (prev.includes(folderPath)) return prev;
+        return [...prev, folderPath];
+      });
+    } catch (e) {
+      setError(`Failed to scan project: ${e}`);
+    }
+  }, []);
+
+  // Rescan only loaded projects (global + scanned projects)
+  const rescanLoaded = useCallback(async () => {
+    try {
+      const globalResult = await scanGlobalOnly();
+      const projectNodes = await Promise.all(
+        scannedProjectPaths.map((p) => scanProjectFolder(p))
+      );
+      const projects = projectNodes
+        .filter((p): p is NonNullable<typeof p> => p !== null)
+        .sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        );
+
+      const result: ConfigTree = {
+        global: globalResult.global,
+        projects,
+        scanTimeMs: globalResult.scanTimeMs,
+      };
+      setTree(result);
+      setRawTreeNodes(buildTreeData(result));
+    } catch (e) {
+      console.error("Rescan loaded failed:", e);
+    }
+  }, [scannedProjectPaths]);
+
+  // Initial scan: global-only + file watcher
   useEffect(() => {
-    rescan();
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await scanGlobalOnly();
+        setTree(result);
+        setRawTreeNodes(buildTreeData(result));
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+
     startWatching().catch(console.error);
 
     let unlisten: (() => void) | undefined;
     listen("config-file-changed", () => {
-      rescan();
+      rescanLoaded();
     }).then((fn) => {
       unlisten = fn;
     });
@@ -98,7 +178,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     return () => {
       unlisten?.();
     };
-  }, [rescan]);
+  }, [rescanLoaded]);
 
   // Search debounce
   useEffect(() => {
@@ -242,6 +322,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         searchResults,
         inheritanceChain,
         rescan,
+        scanProject,
         openFile,
         closeTab,
         setActiveTab: setActiveTabId,

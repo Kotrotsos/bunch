@@ -20,6 +20,21 @@ pub fn build_config_tree() -> ConfigTree {
     }
 }
 
+pub fn build_global_tree() -> ConfigTree {
+    let start = Instant::now();
+    let claude_home = discovery::get_claude_home();
+
+    let global = discovery::scan_global_files(&claude_home);
+
+    let scan_time_ms = start.elapsed().as_millis() as u64;
+
+    ConfigTree {
+        global,
+        projects: Vec::new(),
+        scan_time_ms,
+    }
+}
+
 pub fn build_inheritance_chain(project_encoded_name: &str) -> Option<InheritanceChain> {
     let claude_home = discovery::get_claude_home();
     let global = discovery::scan_global_files(&claude_home);

@@ -1,9 +1,19 @@
 use crate::models::*;
-use crate::scanner::tree_builder;
+use crate::scanner::{discovery, tree_builder};
 
 #[tauri::command]
 pub fn scan_config_tree() -> ConfigTree {
     tree_builder::build_config_tree()
+}
+
+#[tauri::command]
+pub fn scan_global_only() -> ConfigTree {
+    tree_builder::build_global_tree()
+}
+
+#[tauri::command]
+pub fn scan_project_folder(path: String) -> Option<ProjectNode> {
+    discovery::scan_single_project(&path)
 }
 
 #[tauri::command]

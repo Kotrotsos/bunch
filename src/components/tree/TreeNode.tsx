@@ -1,5 +1,5 @@
 import { useConfigTree } from "../../context/ConfigTreeContext";
-import type { TreeNodeData } from "../../types/config-tree";
+import type { TreeNodeData, AgentOwner } from "../../types/config-tree";
 
 interface TreeNodeProps {
   node: TreeNodeData;
@@ -22,6 +22,15 @@ const FILE_TYPE_COLORS: Record<string, string> = {
   CommandMd: "text-green-500",
 };
 
+const OWNER_COLORS: Record<AgentOwner, string> = {
+  Claude: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  Codex: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  Cursor: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  Windsurf: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  Antigravity: "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400",
+  User: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+};
+
 export function TreeNode({ node, depth }: TreeNodeProps) {
   const { openFile, showInheritance, toggleNodeExpanded } = useConfigTree();
 
@@ -31,6 +40,8 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
     const fileType = node.configFile.fileType;
     const icon = FILE_TYPE_ICONS[fileType] || "?";
     const color = FILE_TYPE_COLORS[fileType] || "text-gray-500";
+
+    const owner = node.configFile.owner;
 
     return (
       <button
@@ -46,6 +57,13 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
         <span className="truncate text-gray-700 dark:text-gray-300">
           {node.label}
         </span>
+        {owner && owner !== "User" && (
+          <span
+            className={`ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium rounded ${OWNER_COLORS[owner]}`}
+          >
+            {owner}
+          </span>
+        )}
       </button>
     );
   }

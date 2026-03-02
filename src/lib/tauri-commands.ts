@@ -2,11 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   ConfigTree,
   InheritanceChain,
+  ProjectNode,
   SearchResult,
 } from "../types/config-tree";
 
 export async function scanConfigTree(): Promise<ConfigTree> {
   return invoke<ConfigTree>("scan_config_tree");
+}
+
+export async function scanGlobalOnly(): Promise<ConfigTree> {
+  return invoke<ConfigTree>("scan_global_only");
+}
+
+export async function scanProjectFolder(
+  path: string
+): Promise<ProjectNode | null> {
+  return invoke<ProjectNode | null>("scan_project_folder", { path });
 }
 
 export async function getInheritanceChain(

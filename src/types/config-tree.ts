@@ -7,6 +7,14 @@ export type ConfigFileType =
 
 export type ConfigLevel = "Global" | "Project";
 
+export type AgentOwner =
+  | "Claude"
+  | "Codex"
+  | "Cursor"
+  | "Windsurf"
+  | "Antigravity"
+  | "User";
+
 export interface ConfigFile {
   path: string;
   fileType: ConfigFileType;
@@ -15,6 +23,7 @@ export interface ConfigFile {
   size: number;
   modified: string | null;
   projectPath: string | null;
+  owner: AgentOwner | null;
 }
 
 export interface ProjectNode {

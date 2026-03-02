@@ -140,6 +140,83 @@ pub fn scan_projects(claude_home: &Path) -> Vec<ProjectNode> {
     projects
 }
 
+pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
+    let folder = Path::new(folder_path);
+    if !folder.is_dir() {
+        return None;
+    }
+
+    let project_path = folder_path.to_string();
+    let mut files = Vec::new();
+
+    // CLAUDE.md at project root
+    let claude_md = folder.join("CLAUDE.md");
+    if claude_md.exists() {
+        if let Some(cf) = make_config_file(
+            &claude_md,
+            ConfigFileType::ClaudeMd,
+            ConfigLevel::Project,
+            Some(&project_path),
+        ) {
+            files.push(cf);
+        }
+    }
+
+    // .claude/ directory
+    let claude_dir = folder.join(".claude");
+
+    // settings.local.json
+    let settings_local = claude_dir.join("settings.local.json");
+    if settings_local.exists() {
+        if let Some(cf) = make_config_file(
+            &settings_local,
+            ConfigFileType::SettingsLocalJson,
+            ConfigLevel::Project,
+            Some(&project_path),
+        ) {
+            files.push(cf);
+        }
+    }
+
+    // Project agents
+    let agents_dir = claude_dir.join("agents");
+    if agents_dir.is_dir() {
+        scan_md_dir(
+            &agents_dir,
+            ConfigFileType::AgentMd,
+            ConfigLevel::Project,
+            Some(&project_path),
+            &mut files,
+        );
+    }
+
+    // Project commands
+    let commands_dir = claude_dir.join("commands");
+    if commands_dir.is_dir() {
+        scan_md_dir(
+            &commands_dir,
+            ConfigFileType::CommandMd,
+            ConfigLevel::Project,
+            Some(&project_path),
+            &mut files,
+        );
+    }
+
+    let short_name = extract_project_name(folder_path);
+
+    // Encode the path the same way Claude does (replace / with -)
+    let encoded_path = folder_path
+        .trim_start_matches('/')
+        .replace('/', "-");
+
+    Some(ProjectNode {
+        name: short_name,
+        path: encoded_path,
+        decoded_path: folder_path.to_string(),
+        files,
+    })
+}
+
 /// Decode a dash-encoded project path from ~/.claude/projects/ directory name.
 /// Uses greedy filesystem resolution: tries longest segments first.
 pub fn decode_project_path(encoded: &str) -> String {
@@ -202,7 +279,12 @@ fn scan_md_dir(
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("md") {
-                if let Some(cf) = make_config_file(&path, file_type.clone(), level.clone(), project_path) {
+                if let Some(mut cf) = make_config_file(&path, file_type.clone(), level.clone(), project_path) {
+                    if matches!(file_type, ConfigFileType::AgentMd) {
+                        if let Ok(content) = fs::read_to_string(&path) {
+                            cf.owner = Some(super::owner_inference::infer_agent_owner(&path, &content));
+                        }
+                    }
                     files.push(cf);
                 }
             }
@@ -244,5 +326,6 @@ fn make_config_file(
         size: metadata.len(),
         modified,
         project_path: project_path.map(|s| s.to_string()),
+        owner: None,
     })
 }

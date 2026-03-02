@@ -16,6 +16,16 @@ pub enum ConfigLevel {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AgentOwner {
+    Claude,
+    Codex,
+    Cursor,
+    Windsurf,
+    Antigravity,
+    User,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigFile {
     pub path: String,
@@ -25,6 +35,7 @@ pub struct ConfigFile {
     pub size: u64,
     pub modified: Option<String>,
     pub project_path: Option<String>,
+    pub owner: Option<AgentOwner>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
