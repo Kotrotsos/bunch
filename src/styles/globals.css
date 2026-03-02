@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+  }
+
+  #root {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.gray.300') transparent;
+  }
+
+  .dark * {
+    scrollbar-color: theme('colors.gray.700') transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+}
+
+@layer components {
+  .tree-node-hover {
+    @apply hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-75;
+  }
+
+  .tab-active {
+    @apply border-b-2 border-blue-500 dark:border-blue-400;
+  }
+
+  .inheritance-arrow {
+    @apply w-0.5 h-6 bg-gray-300 dark:bg-gray-600 mx-auto;
+  }
+
+  .filter-pill {
+    @apply px-3 py-1 text-xs rounded-full border transition-colors cursor-pointer select-none;
+    @apply border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400;
+    @apply hover:border-gray-400 dark:hover:border-gray-500;
+  }
+
+  .filter-pill-active {
+    @apply bg-blue-500 dark:bg-blue-600 text-white border-blue-500 dark:border-blue-600;
+  }
+}

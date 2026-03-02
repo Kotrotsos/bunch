@@ -1,0 +1,97 @@
+import { useConfigTree } from "../../context/ConfigTreeContext";
+import type { TreeNodeData } from "../../types/config-tree";
+
+interface TreeNodeProps {
+  node: TreeNodeData;
+  depth: number;
+}
+
+const FILE_TYPE_ICONS: Record<string, string> = {
+  ClaudeMd: "M",
+  SettingsJson: "S",
+  SettingsLocalJson: "S",
+  AgentMd: "A",
+  CommandMd: "C",
+};
+
+const FILE_TYPE_COLORS: Record<string, string> = {
+  ClaudeMd: "text-blue-500",
+  SettingsJson: "text-amber-500",
+  SettingsLocalJson: "text-amber-600",
+  AgentMd: "text-purple-500",
+  CommandMd: "text-green-500",
+};
+
+export function TreeNode({ node, depth }: TreeNodeProps) {
+  const { openFile, showInheritance, toggleNodeExpanded } = useConfigTree();
+
+  const paddingLeft = depth * 16 + 8;
+
+  if (node.type === "file" && node.configFile) {
+    const fileType = node.configFile.fileType;
+    const icon = FILE_TYPE_ICONS[fileType] || "?";
+    const color = FILE_TYPE_COLORS[fileType] || "text-gray-500";
+
+    return (
+      <button
+        onClick={() => openFile(node.configFile!)}
+        className="w-full text-left py-1 pr-2 text-sm tree-node-hover flex items-center gap-2"
+        style={{ paddingLeft }}
+      >
+        <span
+          className={`w-4 h-4 flex items-center justify-center text-xs font-bold rounded ${color}`}
+        >
+          {icon}
+        </span>
+        <span className="truncate text-gray-700 dark:text-gray-300">
+          {node.label}
+        </span>
+      </button>
+    );
+  }
+
+  const isExpandable = node.children.length > 0;
+  const chevron = node.expanded ? "\u25BE" : "\u25B8";
+
+  return (
+    <div>
+      <button
+        onClick={() => toggleNodeExpanded(node.id)}
+        onDoubleClick={() => {
+          if (node.type === "project" && node.project) {
+            showInheritance(node.project.path);
+          }
+        }}
+        className="w-full text-left py-1 pr-2 text-sm tree-node-hover flex items-center gap-1"
+        style={{ paddingLeft }}
+      >
+        {isExpandable && (
+          <span className="w-4 text-center text-gray-400 dark:text-gray-500 text-xs">
+            {chevron}
+          </span>
+        )}
+        <span
+          className={`truncate font-medium ${
+            node.type === "root"
+              ? "text-gray-800 dark:text-gray-200"
+              : node.type === "group"
+                ? "text-gray-600 dark:text-gray-400"
+                : "text-gray-700 dark:text-gray-300"
+          }`}
+        >
+          {node.label}
+        </span>
+        {node.type === "project" && node.project && (
+          <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">
+            {node.project.files.length}
+          </span>
+        )}
+      </button>
+
+      {node.expanded &&
+        node.children.map((child) => (
+          <TreeNode key={child.id} node={child} depth={depth + 1} />
+        ))}
+    </div>
+  );
+}
