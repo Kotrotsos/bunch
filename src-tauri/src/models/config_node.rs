@@ -1,12 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ConfigFileType {
     ClaudeMd,
     SettingsJson,
     SettingsLocalJson,
     AgentMd,
     CommandMd,
+    InstructionMd,
+    CursorRule,
+    ConfigToml,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +28,14 @@ pub enum AgentOwner {
     User,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AgentPlatform {
+    Claude,
+    Codex,
+    Cursor,
+    AgentSpec,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigFile {
@@ -36,6 +47,7 @@ pub struct ConfigFile {
     pub modified: Option<String>,
     pub project_path: Option<String>,
     pub owner: Option<AgentOwner>,
+    pub platform: AgentPlatform,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -9,35 +9,67 @@ pub fn get_claude_home() -> PathBuf {
         .join(".claude")
 }
 
+pub fn get_codex_home() -> PathBuf {
+    if let Ok(codex_home) = std::env::var("CODEX_HOME") {
+        PathBuf::from(codex_home)
+    } else {
+        dirs::home_dir()
+            .expect("Could not determine home directory")
+            .join(".codex")
+    }
+}
+
 pub fn scan_global_files(claude_home: &Path) -> GlobalNode {
     let mut files = Vec::new();
 
-    // Global CLAUDE.md
+    // --- Claude global files ---
     let claude_md = claude_home.join("CLAUDE.md");
     if claude_md.exists() {
-        if let Some(cf) = make_config_file(&claude_md, ConfigFileType::ClaudeMd, ConfigLevel::Global, None) {
+        if let Some(cf) = make_config_file(&claude_md, ConfigFileType::ClaudeMd, ConfigLevel::Global, None, AgentPlatform::Claude) {
             files.push(cf);
         }
     }
 
-    // Global settings.json
     let settings = claude_home.join("settings.json");
     if settings.exists() {
-        if let Some(cf) = make_config_file(&settings, ConfigFileType::SettingsJson, ConfigLevel::Global, None) {
+        if let Some(cf) = make_config_file(&settings, ConfigFileType::SettingsJson, ConfigLevel::Global, None, AgentPlatform::Claude) {
             files.push(cf);
         }
     }
 
-    // Global agents
     let agents_dir = claude_home.join("agents");
     if agents_dir.is_dir() {
-        scan_md_dir(&agents_dir, ConfigFileType::AgentMd, ConfigLevel::Global, None, &mut files);
+        scan_md_dir(&agents_dir, ConfigFileType::AgentMd, ConfigLevel::Global, None, AgentPlatform::Claude, &mut files);
     }
 
-    // Global commands
     let commands_dir = claude_home.join("commands");
     if commands_dir.is_dir() {
-        scan_md_dir(&commands_dir, ConfigFileType::CommandMd, ConfigLevel::Global, None, &mut files);
+        scan_md_dir(&commands_dir, ConfigFileType::CommandMd, ConfigLevel::Global, None, AgentPlatform::Claude, &mut files);
+    }
+
+    // --- Codex global files ---
+    let codex_home = get_codex_home();
+    if codex_home.is_dir() {
+        let codex_agents = codex_home.join("AGENTS.md");
+        if codex_agents.exists() {
+            if let Some(cf) = make_config_file(&codex_agents, ConfigFileType::InstructionMd, ConfigLevel::Global, None, AgentPlatform::Codex) {
+                files.push(cf);
+            }
+        }
+
+        let codex_instructions = codex_home.join("instructions.md");
+        if codex_instructions.exists() {
+            if let Some(cf) = make_config_file(&codex_instructions, ConfigFileType::InstructionMd, ConfigLevel::Global, None, AgentPlatform::Codex) {
+                files.push(cf);
+            }
+        }
+
+        let codex_config = codex_home.join("config.toml");
+        if codex_config.exists() {
+            if let Some(cf) = make_config_file(&codex_config, ConfigFileType::ConfigToml, ConfigLevel::Global, None, AgentPlatform::Codex) {
+                files.push(cf);
+            }
+        }
     }
 
     GlobalNode { files }
@@ -71,22 +103,24 @@ pub fn scan_projects(claude_home: &Path) -> Vec<ProjectNode> {
         let project_path = decoded_path.clone();
 
         let mut files = Vec::new();
+        let project_root = PathBuf::from(&decoded_path);
 
         // Project-level CLAUDE.md (at the decoded project root)
-        let project_claude_md = PathBuf::from(&decoded_path).join("CLAUDE.md");
+        let project_claude_md = project_root.join("CLAUDE.md");
         if project_claude_md.exists() {
             if let Some(cf) = make_config_file(
                 &project_claude_md,
                 ConfigFileType::ClaudeMd,
                 ConfigLevel::Project,
                 Some(&project_path),
+                AgentPlatform::Claude,
             ) {
                 files.push(cf);
             }
         }
 
         // Project .claude/ directory
-        let project_claude_dir = PathBuf::from(&decoded_path).join(".claude");
+        let project_claude_dir = project_root.join(".claude");
 
         // settings.local.json
         let settings_local = project_claude_dir.join("settings.local.json");
@@ -96,6 +130,7 @@ pub fn scan_projects(claude_home: &Path) -> Vec<ProjectNode> {
                 ConfigFileType::SettingsLocalJson,
                 ConfigLevel::Project,
                 Some(&project_path),
+                AgentPlatform::Claude,
             ) {
                 files.push(cf);
             }
@@ -104,13 +139,13 @@ pub fn scan_projects(claude_home: &Path) -> Vec<ProjectNode> {
         // Project agents
         let proj_agents = project_claude_dir.join("agents");
         if proj_agents.is_dir() {
-            scan_md_dir(&proj_agents, ConfigFileType::AgentMd, ConfigLevel::Project, Some(&project_path), &mut files);
+            scan_md_dir(&proj_agents, ConfigFileType::AgentMd, ConfigLevel::Project, Some(&project_path), AgentPlatform::Claude, &mut files);
         }
 
         // Project commands
         let proj_commands = project_claude_dir.join("commands");
         if proj_commands.is_dir() {
-            scan_md_dir(&proj_commands, ConfigFileType::CommandMd, ConfigLevel::Project, Some(&project_path), &mut files);
+            scan_md_dir(&proj_commands, ConfigFileType::CommandMd, ConfigLevel::Project, Some(&project_path), AgentPlatform::Claude, &mut files);
         }
 
         // Also check CLAUDE.md inside the projects entry itself (stored config)
@@ -121,10 +156,14 @@ pub fn scan_projects(claude_home: &Path) -> Vec<ProjectNode> {
                 ConfigFileType::ClaudeMd,
                 ConfigLevel::Project,
                 Some(&project_path),
+                AgentPlatform::Claude,
             ) {
                 files.push(cf);
             }
         }
+
+        // --- Codex: AGENTS.md, AGENTS.override.md ---
+        scan_extra_project_files(&project_root, &project_path, &mut files);
 
         let short_name = extract_project_name(&decoded_path);
 
@@ -157,6 +196,7 @@ pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
             ConfigFileType::ClaudeMd,
             ConfigLevel::Project,
             Some(&project_path),
+            AgentPlatform::Claude,
         ) {
             files.push(cf);
         }
@@ -173,6 +213,7 @@ pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
             ConfigFileType::SettingsLocalJson,
             ConfigLevel::Project,
             Some(&project_path),
+            AgentPlatform::Claude,
         ) {
             files.push(cf);
         }
@@ -186,6 +227,7 @@ pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
             ConfigFileType::AgentMd,
             ConfigLevel::Project,
             Some(&project_path),
+            AgentPlatform::Claude,
             &mut files,
         );
     }
@@ -198,9 +240,13 @@ pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
             ConfigFileType::CommandMd,
             ConfigLevel::Project,
             Some(&project_path),
+            AgentPlatform::Claude,
             &mut files,
         );
     }
+
+    // Codex, Cursor, AgentSpec files
+    scan_extra_project_files(folder, &project_path, &mut files);
 
     let short_name = extract_project_name(folder_path);
 
@@ -215,6 +261,76 @@ pub fn scan_single_project(folder_path: &str) -> Option<ProjectNode> {
         decoded_path: folder_path.to_string(),
         files,
     })
+}
+
+/// Scan for non-Claude agent files in a project root
+fn scan_extra_project_files(
+    project_root: &Path,
+    project_path: &str,
+    files: &mut Vec<ConfigFile>,
+) {
+    // Codex: AGENTS.md
+    let agents_md = project_root.join("AGENTS.md");
+    if agents_md.exists() {
+        if let Some(cf) = make_config_file(
+            &agents_md,
+            ConfigFileType::InstructionMd,
+            ConfigLevel::Project,
+            Some(project_path),
+            AgentPlatform::Codex,
+        ) {
+            files.push(cf);
+        }
+    }
+
+    // Codex: AGENTS.override.md
+    let agents_override = project_root.join("AGENTS.override.md");
+    if agents_override.exists() {
+        if let Some(cf) = make_config_file(
+            &agents_override,
+            ConfigFileType::InstructionMd,
+            ConfigLevel::Project,
+            Some(project_path),
+            AgentPlatform::Codex,
+        ) {
+            files.push(cf);
+        }
+    }
+
+    // AgentSpec: AGENT.md
+    let agent_md = project_root.join("AGENT.md");
+    if agent_md.exists() {
+        if let Some(cf) = make_config_file(
+            &agent_md,
+            ConfigFileType::InstructionMd,
+            ConfigLevel::Project,
+            Some(project_path),
+            AgentPlatform::AgentSpec,
+        ) {
+            files.push(cf);
+        }
+    }
+
+    // Cursor: .cursor/rules/*.mdc
+    let cursor_rules = project_root.join(".cursor").join("rules");
+    if cursor_rules.is_dir() {
+        if let Ok(entries) = fs::read_dir(&cursor_rules) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("mdc") {
+                    if let Some(cf) = make_config_file(
+                        &path,
+                        ConfigFileType::CursorRule,
+                        ConfigLevel::Project,
+                        Some(project_path),
+                        AgentPlatform::Cursor,
+                    ) {
+                        files.push(cf);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Decode a dash-encoded project path from ~/.claude/projects/ directory name.
@@ -273,13 +389,14 @@ fn scan_md_dir(
     file_type: ConfigFileType,
     level: ConfigLevel,
     project_path: Option<&str>,
+    platform: AgentPlatform,
     files: &mut Vec<ConfigFile>,
 ) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("md") {
-                if let Some(mut cf) = make_config_file(&path, file_type.clone(), level.clone(), project_path) {
+                if let Some(mut cf) = make_config_file(&path, file_type.clone(), level.clone(), project_path, platform.clone()) {
                     if matches!(file_type, ConfigFileType::AgentMd) {
                         if let Ok(content) = fs::read_to_string(&path) {
                             cf.owner = Some(super::owner_inference::infer_agent_owner(&path, &content));
@@ -297,6 +414,7 @@ fn make_config_file(
     file_type: ConfigFileType,
     level: ConfigLevel,
     project_path: Option<&str>,
+    platform: AgentPlatform,
 ) -> Option<ConfigFile> {
     let metadata = fs::metadata(path).ok()?;
     let modified = metadata
@@ -327,5 +445,6 @@ fn make_config_file(
         modified,
         project_path: project_path.map(|s| s.to_string()),
         owner: None,
+        platform,
     })
 }

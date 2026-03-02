@@ -3,7 +3,10 @@ export type ConfigFileType =
   | "SettingsJson"
   | "SettingsLocalJson"
   | "AgentMd"
-  | "CommandMd";
+  | "CommandMd"
+  | "InstructionMd"
+  | "CursorRule"
+  | "ConfigToml";
 
 export type ConfigLevel = "Global" | "Project";
 
@@ -15,6 +18,8 @@ export type AgentOwner =
   | "Antigravity"
   | "User";
 
+export type AgentPlatform = "Claude" | "Codex" | "Cursor" | "AgentSpec";
+
 export interface ConfigFile {
   path: string;
   fileType: ConfigFileType;
@@ -24,6 +29,7 @@ export interface ConfigFile {
   modified: string | null;
   projectPath: string | null;
   owner: AgentOwner | null;
+  platform: AgentPlatform;
 }
 
 export interface ProjectNode {

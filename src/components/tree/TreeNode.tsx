@@ -21,6 +21,9 @@ const FILE_TYPE_ICONS: Record<string, string> = {
   SettingsLocalJson: "S",
   AgentMd: "A",
   CommandMd: "C",
+  InstructionMd: "I",
+  CursorRule: "R",
+  ConfigToml: "T",
 };
 
 const FILE_TYPE_COLORS: Record<string, string> = {
@@ -29,6 +32,15 @@ const FILE_TYPE_COLORS: Record<string, string> = {
   SettingsLocalJson: "text-amber-600",
   AgentMd: "text-purple-500",
   CommandMd: "text-green-500",
+  InstructionMd: "text-emerald-500",
+  CursorRule: "text-cyan-500",
+  ConfigToml: "text-rose-500",
+};
+
+const PLATFORM_BADGE: Record<string, string> = {
+  Codex: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  Cursor: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  AgentSpec: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
 };
 
 const OWNER_COLORS: Record<AgentOwner, string> = {
@@ -86,6 +98,13 @@ export function TreeNode({ node, depth }: TreeNodeProps) {
               className={`ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium rounded ${OWNER_COLORS[owner]}`}
             >
               {owner}
+            </span>
+          )}
+          {!owner && node.configFile!.platform !== "Claude" && PLATFORM_BADGE[node.configFile!.platform] && (
+            <span
+              className={`ml-auto shrink-0 px-1.5 py-0 text-[10px] font-medium rounded ${PLATFORM_BADGE[node.configFile!.platform]}`}
+            >
+              {node.configFile!.platform}
             </span>
           )}
         </button>

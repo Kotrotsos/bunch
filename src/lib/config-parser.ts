@@ -1,28 +1,57 @@
-import type { ConfigTree, TreeNodeData, ProjectNode } from "../types/config-tree";
+import type { ConfigTree, TreeNodeData, ProjectNode, AgentPlatform } from "../types/config-tree";
 
 export function buildTreeData(tree: ConfigTree): TreeNodeData[] {
   const roots: TreeNodeData[] = [];
 
-  // Global section
-  const globalNode: TreeNodeData = {
-    id: "global",
-    label: "Global (~/.claude/)",
-    type: "root",
-    children: [],
-    expanded: true,
-  };
+  // Group global files by platform
+  const claudeGlobalFiles = tree.global.files.filter((f) => f.platform === "Claude");
+  const codexGlobalFiles = tree.global.files.filter((f) => f.platform === "Codex");
 
-  for (const file of tree.global.files) {
-    globalNode.children.push({
-      id: `global-${file.path}`,
-      label: file.name,
-      type: "file",
-      configFile: file,
+  // Claude global section
+  if (claudeGlobalFiles.length > 0) {
+    const globalNode: TreeNodeData = {
+      id: "global-claude",
+      label: "Global (~/.claude/)",
+      type: "root",
       children: [],
-    });
+      expanded: true,
+    };
+
+    for (const file of claudeGlobalFiles) {
+      globalNode.children.push({
+        id: `global-${file.path}`,
+        label: file.name,
+        type: "file",
+        configFile: file,
+        children: [],
+      });
+    }
+
+    roots.push(globalNode);
   }
 
-  roots.push(globalNode);
+  // Codex global section
+  if (codexGlobalFiles.length > 0) {
+    const codexNode: TreeNodeData = {
+      id: "global-codex",
+      label: "Global (~/.codex/)",
+      type: "root",
+      children: [],
+      expanded: true,
+    };
+
+    for (const file of codexGlobalFiles) {
+      codexNode.children.push({
+        id: `global-${file.path}`,
+        label: file.name,
+        type: "file",
+        configFile: file,
+        children: [],
+      });
+    }
+
+    roots.push(codexNode);
+  }
 
   // Group projects by parent directory
   const groups = groupProjectsByParent(tree.projects);
@@ -93,9 +122,11 @@ export function filterTreeByType(
 
   const typeMap: Record<string, string[]> = {
     claudemd: ["ClaudeMd"],
-    settings: ["SettingsJson", "SettingsLocalJson"],
+    settings: ["SettingsJson", "SettingsLocalJson", "ConfigToml"],
     agents: ["AgentMd"],
     commands: ["CommandMd"],
+    instructions: ["InstructionMd"],
+    cursorrules: ["CursorRule"],
   };
 
   const allowedTypes = typeMap[filter];
@@ -104,6 +135,37 @@ export function filterTreeByType(
   return nodes
     .map((node) => filterNode(node, allowedTypes))
     .filter((n): n is TreeNodeData => n !== null);
+}
+
+export function filterTreeByPlatform(
+  nodes: TreeNodeData[],
+  platforms: Set<AgentPlatform>
+): TreeNodeData[] {
+  if (platforms.size === 0) return nodes;
+
+  return nodes
+    .map((node) => filterNodeByPlatform(node, platforms))
+    .filter((n): n is TreeNodeData => n !== null);
+}
+
+function filterNodeByPlatform(
+  node: TreeNodeData,
+  platforms: Set<AgentPlatform>
+): TreeNodeData | null {
+  if (node.type === "file") {
+    if (node.configFile && platforms.has(node.configFile.platform)) {
+      return node;
+    }
+    return null;
+  }
+
+  const filteredChildren = node.children
+    .map((child) => filterNodeByPlatform(child, platforms))
+    .filter((c): c is TreeNodeData => c !== null);
+
+  if (filteredChildren.length === 0) return null;
+
+  return { ...node, children: filteredChildren, expanded: node.expanded };
 }
 
 function filterNode(

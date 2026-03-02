@@ -27,10 +27,12 @@ import {
   startWatching,
 } from "../lib/tauri-commands";
 import { open } from "@tauri-apps/plugin-dialog";
-import { buildTreeData, filterTreeByType } from "../lib/config-parser";
+import { buildTreeData, filterTreeByType, filterTreeByPlatform } from "../lib/config-parser";
 import { listen } from "@tauri-apps/api/event";
 
-type FilterType = "claudemd" | "settings" | "agents" | "commands" | null;
+import type { AgentPlatform } from "../types/config-tree";
+
+type FilterType = "claudemd" | "settings" | "agents" | "commands" | "instructions" | "cursorrules" | null;
 
 interface ConfigTreeContextValue {
   tree: ConfigTree | null;
@@ -40,6 +42,7 @@ interface ConfigTreeContextValue {
   tabs: EditorTab[];
   activeTabId: string | null;
   filter: FilterType;
+  platformFilter: Set<AgentPlatform>;
   searchQuery: string;
   searchResults: SearchResult[];
   inheritanceChain: InheritanceChain | null;
@@ -52,6 +55,7 @@ interface ConfigTreeContextValue {
   updateTabContent: (tabId: string, content: string) => void;
   saveTab: (tabId: string) => Promise<void>;
   setFilter: (filter: FilterType) => void;
+  togglePlatform: (platform: AgentPlatform) => void;
   setSearchQuery: (query: string) => void;
   showInheritance: (projectPath: string) => Promise<void>;
   clearInheritance: () => void;
@@ -100,6 +104,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>(null);
+  const [platformFilter, setPlatformFilter] = useState<Set<AgentPlatform>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [inheritanceChain, setInheritanceChain] =
@@ -268,7 +273,10 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  const treeNodes = filterTreeByType(rawTreeNodes, filter);
+  const typeFiltered = filterTreeByType(rawTreeNodes, filter);
+  const treeNodes = platformFilter.size > 0
+    ? filterTreeByPlatform(typeFiltered, platformFilter)
+    : typeFiltered;
 
   const openFile = useCallback(
     async (file: ConfigFile) => {
@@ -283,7 +291,9 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         const isMarkdown =
           file.fileType === "ClaudeMd" ||
           file.fileType === "AgentMd" ||
-          file.fileType === "CommandMd";
+          file.fileType === "CommandMd" ||
+          file.fileType === "InstructionMd" ||
+          file.fileType === "CursorRule";
 
         const tab: EditorTab = {
           id: file.path,
@@ -373,6 +383,18 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const togglePlatform = useCallback((platform: AgentPlatform) => {
+    setPlatformFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(platform)) {
+        next.delete(platform);
+      } else {
+        next.add(platform);
+      }
+      return next;
+    });
+  }, []);
+
   const toggleNodeExpanded = useCallback((nodeId: string) => {
     setRawTreeNodes((prev) => toggleExpanded(prev, nodeId));
   }, []);
@@ -387,6 +409,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         tabs,
         activeTabId,
         filter,
+        platformFilter,
         searchQuery,
         searchResults,
         inheritanceChain,
@@ -399,6 +422,7 @@ export function ConfigTreeProvider({ children }: { children: ReactNode }) {
         updateTabContent,
         saveTab,
         setFilter,
+        togglePlatform,
         setSearchQuery,
         showInheritance,
         clearInheritance,
