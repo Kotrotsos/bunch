@@ -52,7 +52,7 @@ jobs:
             See the assets below to download the installer for your platform.
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --bundles dmg
 
   update-homebrew:
     needs: build
