@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#4C1D95"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A78BFA" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+
+  <!-- Abstract cluster: 6 rounded shapes bunched together -->
+  <!-- Large center shape -->
+  <rect x="390" y="370" width="244" height="284" rx="52" fill="url(#glow)" transform="rotate(-6 512 512)"/>
+
+  <!-- Top left -->
+  <rect x="268" y="248" width="180" height="210" rx="44" fill="#A78BFA" opacity="0.7" transform="rotate(8 358 353)"/>
+
+  <!-- Top right -->
+  <rect x="560" y="232" width="172" height="200" rx="42" fill="#8B5CF6" opacity="0.65" transform="rotate(-12 646 332)"/>
+
+  <!-- Bottom left -->
+  <rect x="280" y="530" width="168" height="196" rx="40" fill="#8B5CF6" opacity="0.6" transform="rotate(10 364 628)"/>
+
+  <!-- Bottom right -->
+  <rect x="572" y="510" width="176" height="205" rx="42" fill="#A78BFA" opacity="0.55" transform="rotate(-8 660 612)"/>
+
+  <!-- Small floating piece top -->
+  <rect x="460" y="190" width="110" height="128" rx="30" fill="url(#accent)" opacity="0.5" transform="rotate(-3 515 254)"/>
+
+  <!-- Subtle connecting lines suggesting grouping -->
+  <circle cx="512" cy="512" r="4" fill="#C4B5FD" opacity="0.8"/>
+  <circle cx="480" cy="490" r="3" fill="#C4B5FD" opacity="0.6"/>
+  <circle cx="544" cy="534" r="3" fill="#C4B5FD" opacity="0.6"/>
+</svg>
